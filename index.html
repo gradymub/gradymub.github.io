@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CATT Codex training</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #8fd3ff 0%, #e0f6ff 45%, #f7fbff 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+      }
+
+      .game-shell {
+        width: min(920px, 100%);
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 24px;
+        padding: 28px;
+        box-shadow: 0 24px 60px rgba(24, 52, 79, 0.2);
+        border: 4px solid #ffffff;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(2rem, 4vw, 2.8rem);
+        text-align: center;
+        color: #0d2d4d;
+      }
+
+      p {
+        margin: 0;
+        text-align: center;
+        color: #2e5577;
+      }
+
+      .scoreboard {
+        margin: 20px auto 8px;
+        display: flex;
+        justify-content: center;
+        gap: 18px;
+        font-weight: 600;
+        color: #0b3858;
+        flex-wrap: wrap;
+      }
+
+      #game {
+        width: 100%;
+        border-radius: 20px;
+        border: 3px solid #b6d9f2;
+        background: #bfe6ff;
+        display: block;
+      }
+
+      .instructions {
+        margin-top: 12px;
+        font-size: 0.95rem;
+      }
+
+      .footer {
+        margin-top: 16px;
+        font-size: 0.85rem;
+        color: #4a6e8c;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game-shell">
+      <h1>CATT Codex training</h1>
+      <p>Build a snowman while gliding on the ice rink!</p>
+      <section class="scoreboard">
+        <div>Snowballs collected: <span id="snowballs">0</span></div>
+        <div>Snowman height: <span id="snowman-level">1</span></div>
+      </section>
+      <canvas id="game" width="880" height="460" aria-label="Snowman building game"></canvas>
+      <p class="instructions">
+        Use arrow keys or WASD to skate. Collect snowballs to stack your snowman. Press R to
+        reset the game.
+      </p>
+      <p class="footer">Tip: Skate across the rink to gather snow faster!</p>
+    </main>
+    <script>
+      const canvas = document.getElementById("game");
+      const context = canvas.getContext("2d");
+      const snowballCount = document.getElementById("snowballs");
+      const snowmanLevel = document.getElementById("snowman-level");
+
+      const rink = {
+        x: 40,
+        y: 90,
+        width: 800,
+        height: 300,
+      };
+
+      const skater = {
+        x: rink.x + rink.width * 0.35,
+        y: rink.y + rink.height * 0.5,
+        radius: 14,
+        speed: 3.4,
+        vx: 0,
+        vy: 0,
+      };
+
+      const snowmanBase = {
+        x: rink.x + rink.width * 0.77,
+        y: rink.y + rink.height * 0.62,
+      };
+
+      let snowballs = 0;
+      let snowmanStage = 1;
+      const maxStage = 5;
+
+      const snowballTargets = Array.from({ length: 6 }, () => createSnowball());
+      const keys = new Set();
+
+      function createSnowball() {
+        return {
+          x: rink.x + 30 + Math.random() * (rink.width - 60),
+          y: rink.y + 30 + Math.random() * (rink.height - 60),
+          radius: 10 + Math.random() * 6,
+          active: true,
+        };
+      }
+
+      function resetGame() {
+        skater.x = rink.x + rink.width * 0.35;
+        skater.y = rink.y + rink.height * 0.5;
+        snowballs = 0;
+        snowmanStage = 1;
+        snowballTargets.forEach((snowball, index) => {
+          const resetSnowball = createSnowball();
+          snowballTargets[index] = resetSnowball;
+        });
+        updateScoreboard();
+      }
+
+      function updateScoreboard() {
+        snowballCount.textContent = snowballs;
+        snowmanLevel.textContent = snowmanStage;
+      }
+
+      function drawBackground() {
+        const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, "#8fd3ff");
+        gradient.addColorStop(0.55, "#d6f3ff");
+        gradient.addColorStop(1, "#f9fdff");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawCloud(120, 70, 1);
+        drawCloud(650, 60, 0.9);
+        drawCloud(450, 90, 1.1);
+
+        drawMountains();
+        drawTrees();
+
+        context.fillStyle = "#eaf7ff";
+        context.fillRect(0, rink.y + rink.height - 35, canvas.width, 70);
+      }
+
+      function drawCloud(x, y, scale) {
+        context.save();
+        context.translate(x, y);
+        context.scale(scale, scale);
+        context.fillStyle = "rgba(255, 255, 255, 0.9)";
+        context.beginPath();
+        context.ellipse(0, 0, 30, 18, 0, 0, Math.PI * 2);
+        context.ellipse(28, -4, 24, 16, 0, 0, Math.PI * 2);
+        context.ellipse(-28, -4, 24, 16, 0, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
+
+      function drawMountains() {
+        context.fillStyle = "#8ab0c6";
+        context.beginPath();
+        context.moveTo(0, 190);
+        context.lineTo(140, 60);
+        context.lineTo(320, 200);
+        context.lineTo(520, 80);
+        context.lineTo(700, 210);
+        context.lineTo(880, 90);
+        context.lineTo(880, 240);
+        context.lineTo(0, 240);
+        context.closePath();
+        context.fill();
+
+        context.fillStyle = "#cfe7f5";
+        context.beginPath();
+        context.moveTo(140, 60);
+        context.lineTo(200, 145);
+        context.lineTo(80, 150);
+        context.closePath();
+        context.fill();
+      }
+
+      function drawTrees() {
+        const treePositions = [50, 140, 720, 800];
+        treePositions.forEach((x) => {
+          context.fillStyle = "#3f6d5c";
+          context.beginPath();
+          context.moveTo(x, 260);
+          context.lineTo(x + 30, 200);
+          context.lineTo(x + 60, 260);
+          context.closePath();
+          context.fill();
+        });
+      }
+
+      function drawRink() {
+        context.save();
+        context.fillStyle = "rgba(185, 231, 255, 0.85)";
+        context.strokeStyle = "#8bc4e8";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.roundRect(rink.x, rink.y, rink.width, rink.height, 40);
+        context.fill();
+        context.stroke();
+
+        context.strokeStyle = "rgba(120, 170, 210, 0.6)";
+        context.lineWidth = 2;
+        for (let i = 1; i < 4; i += 1) {
+          context.beginPath();
+          context.moveTo(rink.x + (rink.width / 4) * i, rink.y + 22);
+          context.lineTo(rink.x + (rink.width / 4) * i, rink.y + rink.height - 22);
+          context.stroke();
+        }
+        context.restore();
+      }
+
+      function drawSnowball(snowball) {
+        context.save();
+        context.fillStyle = "#ffffff";
+        context.strokeStyle = "#d0e8ff";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(snowball.x, snowball.y, snowball.radius, 0, Math.PI * 2);
+        context.fill();
+        context.stroke();
+        context.restore();
+      }
+
+      function drawSkater() {
+        context.save();
+        context.translate(skater.x, skater.y);
+        context.fillStyle = "#ff6f91";
+        context.beginPath();
+        context.arc(0, -12, 10, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#2b4b6f";
+        context.fillRect(-8, -2, 16, 20);
+        context.strokeStyle = "#1d2f42";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(-12, 20);
+        context.lineTo(12, 20);
+        context.stroke();
+        context.restore();
+      }
+
+      function drawSnowman() {
+        context.save();
+        const size = 18 + snowmanStage * 6;
+        const baseY = snowmanBase.y + 55;
+
+        for (let i = 0; i < snowmanStage; i += 1) {
+          const radius = size - i * 6;
+          const y = baseY - i * (radius * 1.1);
+          context.fillStyle = "#ffffff";
+          context.strokeStyle = "#cfe7ff";
+          context.lineWidth = 2;
+          context.beginPath();
+          context.arc(snowmanBase.x, y, radius, 0, Math.PI * 2);
+          context.fill();
+          context.stroke();
+
+          if (i === snowmanStage - 1) {
+            context.fillStyle = "#1d2f42";
+            context.beginPath();
+            context.arc(snowmanBase.x - 6, y - 4, 2.2, 0, Math.PI * 2);
+            context.arc(snowmanBase.x + 6, y - 4, 2.2, 0, Math.PI * 2);
+            context.fill();
+
+            context.strokeStyle = "#f3a23a";
+            context.lineWidth = 3;
+            context.beginPath();
+            context.moveTo(snowmanBase.x, y + 2);
+            context.lineTo(snowmanBase.x + 10, y + 4);
+            context.stroke();
+          }
+        }
+        context.restore();
+      }
+
+      function update() {
+        skater.vx = 0;
+        skater.vy = 0;
+        if (keys.has("ArrowUp") || keys.has("w")) {
+          skater.vy = -skater.speed;
+        }
+        if (keys.has("ArrowDown") || keys.has("s")) {
+          skater.vy = skater.speed;
+        }
+        if (keys.has("ArrowLeft") || keys.has("a")) {
+          skater.vx = -skater.speed;
+        }
+        if (keys.has("ArrowRight") || keys.has("d")) {
+          skater.vx = skater.speed;
+        }
+
+        skater.x = Math.min(rink.x + rink.width - skater.radius, Math.max(rink.x + skater.radius, skater.x + skater.vx));
+        skater.y = Math.min(rink.y + rink.height - skater.radius, Math.max(rink.y + skater.radius, skater.y + skater.vy));
+
+        snowballTargets.forEach((snowball) => {
+          if (!snowball.active) {
+            return;
+          }
+          const dx = skater.x - snowball.x;
+          const dy = skater.y - snowball.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < skater.radius + snowball.radius) {
+            snowball.active = false;
+            snowballs += 1;
+            if (snowballs % 3 === 0 && snowmanStage < maxStage) {
+              snowmanStage += 1;
+            }
+            updateScoreboard();
+          }
+        });
+
+        if (snowballTargets.every((snowball) => !snowball.active)) {
+          snowballTargets.forEach((snowball, index) => {
+            snowballTargets[index] = createSnowball();
+          });
+        }
+      }
+
+      function render() {
+        drawBackground();
+        drawRink();
+        snowballTargets.forEach((snowball) => {
+          if (snowball.active) {
+            drawSnowball(snowball);
+          }
+        });
+        drawSnowman();
+        drawSkater();
+      }
+
+      function tick() {
+        update();
+        render();
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener("keydown", (event) => {
+        keys.add(event.key);
+        if (event.key.toLowerCase() === "r") {
+          resetGame();
+        }
+      });
+
+      window.addEventListener("keyup", (event) => {
+        keys.delete(event.key);
+      });
+
+      updateScoreboard();
+      tick();
+    </script>
+  </body>
+</html>
